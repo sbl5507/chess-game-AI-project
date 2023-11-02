@@ -11,8 +11,6 @@ import copy
 
 from board.move import move
 
-
-
 pygame.init()
 gamedisplay= pygame.display.set_mode((800,800))
 pygame.display.set_caption("pychess")

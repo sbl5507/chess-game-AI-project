@@ -102,9 +102,6 @@ class AI:
 
 
 
-
-
-
     def minimax(self,gametiles, depth,alpha , beta ,player):
         if depth==0 or self.checkmate(gametiles)==True or self.stalemate(gametiles,player)==True:
             return self.calculateb(gametiles)
@@ -234,8 +231,6 @@ class AI:
 
         return kp,ks
 
-
-
     def calci(self,gametiles,y,x,moves):
         arr=[]
         jk=object
@@ -249,50 +244,108 @@ class AI:
             arr.append([y,x,move[0],move[1],mk])
         return arr
 
+    def calculateb(self, gametiles):
+        # Basic values for pieces
+        piece_value = {"p": 100, "n": 320, "b": 330, "r": 500, "q": 900, "k": 10000}
+        value = 0
 
-    def calculateb(self,gametiles):
-        value=0
+        # Counting pieces to determine endgame
+        total_pieces = 0
+         # Additional factors
+        mobility_bonus = 0
+        pawn_structure_bonus = 0
+        piece_coordination_bonus = 0
+        piece_activity_bonus = 0
+        # development_score = 0
+        central_control_bonus = 0
+
+        # Checking and calculating value for each piece
         for x in range(8):
             for y in range(8):
-                    if gametiles[y][x].pieceonTile.tostring()=='P':
-                        value=value-100
+                piece = gametiles[y][x].pieceonTile.tostring()
+                if piece != '-':  # '-' indicates an empty square
+                    total_pieces += 1
+                    modifier = -1 if piece.isupper() else 1  # Black pieces are upper case, white pieces are lower case
 
-                    if gametiles[y][x].pieceonTile.tostring()=='N':
-                        value=value-350
+                    # Calculate positional bonus for central control
+                    if x in [2, 3, 4, 5] and y in [2, 3, 4, 5]:
+                        central_control_bonus = 10
 
-                    if gametiles[y][x].pieceonTile.tostring()=='B':
-                        value=value-350
+                    # Calculate the piece's value
+                    value += modifier * (piece_value.get(piece.lower(), 0) + central_control_bonus)
 
-                    if gametiles[y][x].pieceonTile.tostring()=='R':
-                        value=value-525
+                    legal_moves = gametiles[y][x].pieceonTile.legalmoveb(gametiles)
+                    if legal_moves is not None:
+                        mobility_bonus += len(legal_moves) * modifier
 
-                    if gametiles[y][x].pieceonTile.tostring()=='Q':
-                        value=value-1000
+                    if piece.lower() == 'p':
+                        pawn_structure_bonus += self.calculate_pawn_structure(gametiles, x, y, modifier)
 
-                    if gametiles[y][x].pieceonTile.tostring()=='K':
-                        value=value-10000
+                    piece_coordination_bonus += self.calculate_piece_coordination(gametiles, x, y, modifier)
+                    # development_score = self.calculate_development_score(gametiles)
 
-                    if gametiles[y][x].pieceonTile.tostring()=='p':
-                        value=value+100
+                    if piece.lower() == 'n':
+                        if x in [2, 3, 4, 5] and y in [2, 3, 4, 5]:
+                            piece_activity_bonus += 10
 
-                    if gametiles[y][x].pieceonTile.tostring()=='n':
-                        value=value+350
-
-                    if gametiles[y][x].pieceonTile.tostring()=='b':
-                        value=value+350
-
-                    if gametiles[y][x].pieceonTile.tostring()=='r':
-                        value=value+525
-
-                    if gametiles[y][x].pieceonTile.tostring()=='q':
-                        value=value+1000
-
-                    if gametiles[y][x].pieceonTile.tostring()=='k':
-                        value=value+10000
+        # Adjust king's value in endgame
+        if total_pieces <= 16:
+            value += (piece_value["k"] * 2 if 'K' in [gametiles[y][x].pieceonTile.tostring() for y in range(8) for x in range(8)] else 0)
+            value -= (piece_value["k"] * 2 if 'k' in [gametiles[y][x].pieceonTile.tostring() for y in range(8) for x in range(8)] else 0)
+        
+        value += mobility_bonus
+        value += pawn_structure_bonus
+        value += piece_coordination_bonus
+        value += piece_activity_bonus
+        # value += development_score
 
         return value
+     
+    # def calculate_development_score(self, gametiles):
+    #     development_score = 0
+    #     for x in range(8):
+    #         for y in range(8):
+    #             piece = gametiles[y][x].pieceonTile.tostring()
+    #             if piece != '-':
+    #                 modifier = -1 if piece.isupper() else 1
+    #                 if piece.lower() in ['p', 'n', 'b', 'r', 'q', 'k']:
+    #                     centralization_bonus = self.calculate_centralization_bonus(x, y)
+    #                     development_score += centralization_bonus * modifier
+    #     return development_score
+    
+    # def calculate_centralization_bonus(self, x, y):
+    #     central_squares = [(3, 3), (3, 4), (4, 3), (4, 4)]  # Central squares
+    #     if (x, y) in central_squares:
+    #         return 10  # Award bonus points for pieces on central squares
+    #     return 0
 
-
+    def calculate_pawn_structure(self, gametiles, x, y, modifier):
+        pawn_structure_bonus = 0
+        if modifier == 1:
+            for dy in [-1, 1]:
+                if 0 <= x + dy < 8 and gametiles[y][x + dy].pieceonTile.tostring() == 'p':
+                    pawn_structure_bonus -= 10
+        else:  # For black pawns
+            for dy in [-1, 1]:
+                if 0 <= x + dy < 8 and gametiles[y][x + dy].pieceonTile.tostring() == 'P':
+                    pawn_structure_bonus -= 10
+        return pawn_structure_bonus
+    
+    def calculate_piece_coordination(self, gametiles, x, y, modifier):
+        piece_coordination_bonus = 0
+        piece = gametiles[y][x].pieceonTile.tostring()
+        if piece.lower() == 'q':
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    if dx == 0 and dy == 0:
+                        continue
+                    new_x, new_y = x + dx, y + dy
+                    if 0 <= new_x < 8 and 0 <= new_y < 8:
+                        target_piece = gametiles[new_y][new_x].pieceonTile.tostring()
+                        if target_piece.lower() == 'k':
+                            piece_coordination_bonus += 5
+        return piece_coordination_bonus
+    
     def move(self,gametiles,y,x,n,m):
         promotion=False
         if gametiles[y][x].pieceonTile.tostring()=='K' or gametiles[y][x].pieceonTile.tostring()=='R':
@@ -330,8 +383,6 @@ class AI:
                 promotion=False
 
         return gametiles
-
-
 
     def revmove(self,gametiles,x,y,n,m,mts):
         if gametiles[x][y].pieceonTile.tostring()=='K':
@@ -409,8 +460,6 @@ class AI:
 
         return gametiles
 
-
-
     def movew(self,gametiles,y,x,n,m):
         promotion=False
         if gametiles[y][x].pieceonTile.tostring()=='k' or gametiles[y][x].pieceonTile.tostring()=='r':
@@ -448,28 +497,3 @@ class AI:
                 promotion=False
 
         return gametiles
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                        
